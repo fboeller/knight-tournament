@@ -1,6 +1,8 @@
-module KnightTournament ( knight, game ) where
+module KnightTournament ( Knight, game ) where
 
 import Data.Foldable
+import Data.Either
+import Data.Maybe
 
 data Knight = Knight
   String -- Name
@@ -8,11 +10,17 @@ data Knight = Knight
   Int -- Damage
   deriving Show
 
-knight :: String -> Int -> Int -> Knight
-knight name health damage
-  | health <= 0 = error $ "Knight " ++ name ++ " already dead!"
-  | damage < 0 = error $ "Knight " ++ name ++ " can not deal negative damage!"
-  | otherwise = Knight name health damage
+type ValidationError = String
+
+validateKnight :: Knight -> [ValidationError]
+validateKnight (Knight name health damage) =
+  map snd $ filter fst validations
+  where validations = [
+          (health <= 0, "Knight " ++ name ++ " already dead!"),
+          (damage < 0, "Knight " ++ name ++ " can not deal negative damage!")]
+
+validateArena :: Arena -> [ValidationError]
+validateArena = concat.(map validateKnight)
 
 -- The arena is a queue of knights
 type Arena = [Knight]
@@ -30,5 +38,7 @@ turn :: Arena -> Arena
 turn (knight@(Knight _ _ damage) : knight' : knights) =
   toList (takeHit damage knight') ++ knights ++ [knight]
 
-game :: Arena -> Arena
-game = until ((2>).length) turn
+game :: Arena -> Either [ValidationError] Knight
+game arena = case validateArena arena of
+  [] -> Right $ head $ until ((1==).length) turn arena
+  errors -> Left errors
